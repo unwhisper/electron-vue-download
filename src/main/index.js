@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import Update from '../../static/update'
 
 /**
  * Set `__static` path to static files in production
@@ -33,6 +34,8 @@ function createWindow () {
     width: 1000
   })
 
+  let update = new Update(mainWindow)
+  update.load()
   //http://wallpaperswide.com/download/winter_nature_3-1920x1080.html?dw_url=download%2Fwinter_nature_3-&dw_ratio=hd&dlw_block_wide=960x600&dlw_block_hd=1920x1080&dlw_block_standard=800x600&dlw_block_mobile=540x960&dlw_block_dual=1920x600
     
   var downloadItems = new Map();
@@ -94,12 +97,25 @@ function createWindow () {
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
     //设置文件存放位置
     let filename = item.getFilename();
+    let name = filename.substring(0,filename.lastIndexOf("."));
+    let ext = filename.substring(filename.lastIndexOf("."));
     //item.setSavePath(folderpath+`\\${filename}`);
     fs.stat(folderpath+`\\${filename}`, function(err, stat){
         if(stat&&stat.isFile()) {
             console.log('文件存在！');
-            let time = new Date().getTime();
-            item.setSavePath(folderpath+`\\${time}${filename}`);
+            
+            /*let time = new Date().getTime();
+            item.setSavePath(folderpath+`\\${time}${filename}`); */
+            /* for(let i=1; i<3 ; i++){
+              let new_path = name+'('+i+')'+ext
+              fs.stat(new_path, (err, stats)=>{
+                if(!stats) {
+                  item.setSavePath(new_path);
+                  // break;
+                  console.log(i);
+                }
+              })
+            } */
         } else {
             item.setSavePath(folderpath+`\\${filename}`);
         }
@@ -131,8 +147,10 @@ function createWindow () {
     item.once('done', (event, state) => {
         if (state === 'completed') {
         console.log('下载完成！')
+        console.log(item.getSavePath())
         downloadItems.delete(md5(item.getURL()))
         mainWindow.webContents.send('tips', '下载完成')
+        mainWindow.webContents.send('file', item.getSavePath())
         } else {
         console.log(`下载失败: ${state}`)
         }

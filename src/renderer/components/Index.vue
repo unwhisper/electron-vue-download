@@ -15,34 +15,63 @@
     <Button type="info" size="small" id="start" ghost icon="md-play" @click="resumeDownload"></Button>
     <Button type="warning" size="small" id="cancel" ghost @click="cancelDownload">取消下载</Button>
   </div>
-  <div class="input">
-    <Circle :percent="percent" :stroke-color="color" :size="60">
+  <div class="input" style="display:flex;align-items: center;">
+    <div>
+      <Circle :percent="percent" :stroke-color="color" :size="60">
         <Icon v-if="percent == 100" type="ios-checkmark" size="60" style="color:#5cb85c"></Icon>
         <span v-else style="font-size:14px">{{percents}}%</span>
-    </Circle>
+      </Circle>
+    </div>
+    <div style="margin-left:20px;">
+      <Button type="info" @click="openFile">打开文件</Button>
+      <Button type="info" @click="openFileHandler">打开文件夹</Button>
+    </div>
+    <!-- <div>
+      {{version}}
+    </div> -->
+    <div>
+    <Button type="primary" @click="modela">普通组件使用方法</Button>
+    <Modal width="300" v-model="modal1" :mask-closable="false" :mask="false" :title="title">
+      <div v-if="type === tips">
+        <h1>{{tips}}</h1>
+      </div>
+      <div style="display: flex;align-items: center;justify-content: center;" v-else-if="type === progress">
+        <h3>下载中：</h3>
+        <Circle :percent="progress" :stroke-color="color" :size="40">
+          <Icon v-if="progress == 100" type="ios-checkmark" size="40" style="color:#5cb85c"></Icon>
+          <span v-else style="font-size:10px">{{progress}}%</span>
+        </Circle>
+      </div>
+      <div v-else></div>
+    </Modal>
+  </div>
   </div>
 </div>
 </template>
 
 <script>
   import Download from '../../../static/download.js'
-  const { dialog } = require('electron').remote
+  const { dialog ,shell } = require('electron').remote
   const { ipcRenderer } = require('electron')
   const LNDB = require('lndb')
   const db = new LNDB('./')
-
+  const json_package = require("../../../package.json");
   // 初始类型
   const download = db.init('download')
   export default {
     name: 'Index',
     data() {
       return {
-        button_download : '下载',
-        button_stop : '暂停',
-        button_restart : '开始',
         percent: 0,
         percents: 0,
-        color: '#2db7f5'
+        color: '#2db7f5',
+        file_path: '',
+        version: json_package.version,
+        title: json_package.name,
+        modal1: false,
+        tips: '',
+        progress: 0,
+        type: 'tips'
       }
     },
     mounted() {
@@ -56,6 +85,17 @@
 
     // 清空类型下所有缓存
     //pg.clear()
+    ipcRenderer.on("message", (event, text) => {
+      this.modal1 = true
+      this.type = 'tips'
+      this.tips = text;
+    });
+    ipcRenderer.on("downloadProgress", (event, progressObj)=> {
+      this.modal1 = true
+      this.type = 'progress'
+      this.progress = progressObj.percent || 0;
+    });
+
     let downloadPath = download.get('downloadPath')
     console.log(downloadPath.txt)
     if(downloadPath && downloadPath.txt) {
@@ -65,6 +105,17 @@
 
     },
     methods: {
+      modela() {
+        this.modal1 = true;
+      },
+      openFileHandler() {
+        /* let downloadPath = download.get('downloadPath')
+        let path = downloadPath.txt */
+        shell.showItemInFolder(this.file_path);
+      },
+      openFile() {
+        shell.openItem(this.file_path)
+      },
       /**
        * 选择文件夹
        */
@@ -106,6 +157,10 @@
                   this.percents = tips;
                   this.percent = tips | 0
                 }
+            })
+
+            ipcRenderer.on('file',(event, tips) => {
+              this.file_path = tips;
             })
             
             ipcRenderer.send('download',JSON.stringify({

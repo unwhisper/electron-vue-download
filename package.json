@@ -1,6 +1,6 @@
 {
   "name": "electronDownload",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "author": "whisper57124",
   "description": "electron-vue文件下载",
   "license": "ISC",
@@ -27,6 +27,12 @@
     "directories": {
       "output": "build"
     },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://127.0.0.1/electron/download/"
+      }
+    ],
     "dmg": {
       "background": "",
       "window": {
@@ -97,6 +103,7 @@
     "electron-builder": "^20.19.2",
     "electron-debug": "^1.5.0",
     "electron-devtools-installer": "^2.2.4",
+    "electron-updater": "^3.2.3",
     "file-loader": "^1.1.11",
     "html-webpack-plugin": "^3.2.0",
     "mini-css-extract-plugin": "0.4.0",
