@@ -39,16 +39,22 @@ function createWindow () {
     width: 1000
   })
 
+  const update = new Update(mainWindow)
+  ipcMain.on("checkForUpdate", () => {
+    /* if (process.env.NODE_ENV !== 'development') {
+        //执行自动检查更新
+        autoUpdater.checkForUpdates();
+    } */
+    update.checkUpdate()
+  })
+
   ipcMain.on('update',(event, arg) => {
     console.log(arg)
     if(arg == 'update') {
-      let update = new Update(mainWindow)
       update.autoUpdate()
     }else if(arg == 'autoCheckUpdate') {
-      let update = new Update(mainWindow)
       update.autoCheckUpdate()
     }else if(arg == 'handCheckUpdate') {
-      let update = new Update(mainWindow)
       update.handCheckUpdate()
     }
   })

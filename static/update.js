@@ -15,16 +15,9 @@ class Update {
     //https://www.kuk.ink/application/
     //http://127.0.0.1/electron/download/
     autoUpdater.setFeedURL('http://127.0.0.1/electron/download/') // 更新地址与package.json中的build.publish.url相对应
-    /**
-    * 根据自身需求选择下方方法
-    */
-    /* this.error()
-    this.start()
-    this.allow()
-    this.unallowed()
-    this.listen()
-    this.download() */
+    autoUpdater.autoDownload = false; //默认true，禁止自动更新
   }
+
   Message (msg) {
     this.mainWindow.webContents.send('message', msg)
   }
@@ -44,7 +37,7 @@ class Update {
 
   auto_allow () { // 自动更新时，发现可更新数据时
     autoUpdater.on('update-available', (info) => {
-      //this.mainWindow.webContents.send('updateAvailable', '<h3>检测到新版本' + info.version + '，是否升级？</h3>');
+      this.mainWindow.webContents.send('autoUpdateAvailable', '<h3>检测到新版本' + info.version + '，正在下载...</h3>');
     })
   }
 
@@ -66,7 +59,7 @@ class Update {
     })
   }
 
-  download_success () { //监听下载完成事件
+  download () { //监听下载完成事件
     autoUpdater.on('update-downloaded', () => {
       //监听渲染线程中用户是否应用更新
       ipcMain.on('isUpdateNow', () => {
@@ -76,38 +69,30 @@ class Update {
     })
   }
 
-  isAllow_download() {//监听渲染线程中用户是否同意下载
+  isAllow_download() {//是否同意下载
     ipcMain.on("isDownload", () => {
       autoUpdater.downloadUpdate();
     })
   }
 
   checkUpdate() {
-    ipcMain.on("checkForUpdate", () => {
-      /* if (process.env.NODE_ENV !== 'development') {
-          //执行自动检查更新
-          autoUpdater.checkForUpdates();
-      } */
-      autoUpdater.checkForUpdates();
-    })
+    autoUpdater.checkForUpdates();
   }
 
   autoUpdate () { // 自动更新
     this.error()
     this.auto_allow()
     this.listen()
-    this.download_success()
+    this.download()
     this.isAllow_download()
-    this.checkUpdate()
   }
 
   autoCheckUpdate() { //自动检测新版本
     this.error()
     this.check_allow()
     this.listen()
-    this.download_success()
+    this.download()
     this.isAllow_download()
-    this.checkUpdate()
   }
 
   handCheckUpdate() { //手动检测新版本
@@ -115,9 +100,8 @@ class Update {
     this.check_allow()
     this.unallowed()
     this.listen()
-    this.download_success()
+    this.download()
     this.isAllow_download()
-    this.checkUpdate()
   }
 }
 export default Update

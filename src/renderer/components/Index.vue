@@ -39,9 +39,9 @@
       <Button type="info" @click="openFile">打开文件</Button>
       <Button type="info" @click="openFileHandler">打开文件夹</Button>
     </div>
-    <!-- <div>
-      {{version}}
-    </div> -->
+    <div>
+      版本：{{version}}
+    </div>
     <div>
     <!-- <Button type="primary" @click="modela">普通组件使用方法</Button> -->
     <Button type="primary" @click="handCheckUpdate">检测更新</Button>
@@ -89,16 +89,14 @@
       this.update_type = updateType.txt
     }
 
+    if(navigator.onLine){
+      ipcRenderer.send("checkForUpdate");
+    }
+
     if(this.update_type == 'auto') {
-      if(navigator.onLine){
-        ipcRenderer.send("checkForUpdate");
-      }
-      ipcRenderer.send('isDownload');
       ipcRenderer.send('update',"update");
+      //ipcRenderer.send('isDownload');
     }else if(this.update_type == 'tips') {
-      if(navigator.onLine){
-        ipcRenderer.send("checkForUpdate");
-      }
       ipcRenderer.send('update',"autoCheckUpdate");
     }
     // 收到消息
@@ -153,6 +151,15 @@
           this.$Message.info('Clicked cancel');
         }
       });
+    });
+
+    ipcRenderer.on("autoUpdateAvailable", (event, message) => {
+      this.$Modal.info({
+        title: '检测更新',
+        content: message,
+        width: 270 
+      });
+      ipcRenderer.send('isDownload');
     });
 
     /* // 网络可达情况下检测是否有新版本
