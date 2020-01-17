@@ -10,6 +10,19 @@
     <Button type="primary" id="changePath" @click="choosePath">选择文件夹</Button>
   </div>
   <div class="input">
+    <label>更新方式:</label>
+    <RadioGroup v-model="update_type" @on-change="updateType" vertical>
+        <Radio label="auto">
+            <Icon type="social-auto"></Icon>
+            <span>自动更新</span>
+        </Radio>
+        <Radio label="tips">
+            <Icon type="social-tips"></Icon>
+            <span>新版本提示更新</span>
+        </Radio>
+    </RadioGroup>
+  </div>
+  <div class="input">
     <Button type="success" size="small" id="download" ghost icon="md-download" @click="startDownload"></Button>
     <Button type="error" size="small" id="stop" ghost icon="md-pause" @click="stopDownload"></Button>
     <Button type="info" size="small" id="start" ghost icon="md-play" @click="resumeDownload"></Button>
@@ -30,20 +43,9 @@
       {{version}}
     </div> -->
     <div>
-    <Button type="primary" @click="modela">普通组件使用方法</Button>
-    <Modal width="300" v-model="modal1" :mask-closable="false" :mask="false" :title="title">
-      <div v-if="type === tips">
-        <h1>{{tips}}</h1>
-      </div>
-      <div style="display: flex;align-items: center;justify-content: center;" v-else-if="type === progress">
-        <h3>下载中：</h3>
-        <Circle :percent="progress" :stroke-color="color" :size="40">
-          <Icon v-if="progress == 100" type="ios-checkmark" size="40" style="color:#5cb85c"></Icon>
-          <span v-else style="font-size:10px">{{progress}}%</span>
-        </Circle>
-      </div>
-      <div v-else></div>
-    </Modal>
+    <!-- <Button type="primary" @click="modela">普通组件使用方法</Button> -->
+    <Button type="primary" @click="handCheckUpdate">检测更新</Button>
+    
   </div>
   </div>
 </div>
@@ -58,6 +60,7 @@
   const json_package = require("../../../package.json");
   // 初始类型
   const download = db.init('download')
+  const update = db.init('updateType')
   export default {
     name: 'Index',
     data() {
@@ -66,12 +69,8 @@
         percents: 0,
         color: '#2db7f5',
         file_path: '',
-        version: json_package.version,
-        title: json_package.name,
-        modal1: false,
-        tips: '',
-        progress: 0,
-        type: 'tips'
+        version: json_package.version,      
+        update_type: ''
       }
     },
     mounted() {
@@ -85,19 +84,136 @@
 
     // 清空类型下所有缓存
     //pg.clear()
+    let updateType = update.get('updateType')
+    if(updateType && updateType.txt) {
+      this.update_type = updateType.txt
+    }
+
+    if(this.update_type == 'auto') {
+      if(navigator.onLine){
+        ipcRenderer.send("checkForUpdate");
+      }
+      ipcRenderer.send('isDownload');
+      ipcRenderer.send('update',"update");
+    }else if(this.update_type == 'tips') {
+      if(navigator.onLine){
+        ipcRenderer.send("checkForUpdate");
+      }
+      ipcRenderer.send('update',"autoCheckUpdate");
+    }
+    // 收到消息
     ipcRenderer.on("message", (event, text) => {
-      this.modal1 = true
-      this.type = 'tips'
-      this.tips = text;
-    });
-    ipcRenderer.on("downloadProgress", (event, progressObj)=> {
-      this.modal1 = true
-      this.type = 'progress'
-      this.progress = progressObj.percent || 0;
+      this.$Modal.info({
+        title: '检测更新',
+        content: text ,
+        width: 270 
+      });
     });
 
+    // 下载进度
+    ipcRenderer.on("downloadProgress", (event, progressObj)=> {
+      let progress = progressObj.percent | 0;
+      this.$Modal.info({
+        title: '检测更新',
+        content: '下载进度：' + progress + '%',
+        width: 270 
+      });
+    }); 
+
+    // 安装
+    ipcRenderer.on("isUpdateNow", () => {
+        // 是否更新
+        this.$Modal.confirm({
+          title: '检测更新',
+          content: '下载完成，是否立即安装？(安装需要重启应用)',
+          okText: '更新',
+          cancelText: '取消',
+          onOk: () => {
+            ipcRenderer.send("isUpdateNow");
+            this.$Message.info('Clicked ok');
+          },
+          onCancel: () => {
+            this.$Message.info('Clicked cancel');
+          }
+      });
+    });
+
+    // 检测到新版本
+    ipcRenderer.on("updateAvailable", (event, message) => {
+      this.$Modal.confirm({
+        title: '检测更新',
+        content: message,
+        okText: '更新',
+        cancelText: '取消',
+        onOk: () => {
+          ipcRenderer.send('isDownload');
+          this.$Message.info('Clicked ok');
+        },
+        onCancel: () => {
+          this.$Message.info('Clicked cancel');
+        }
+      });
+    });
+
+    /* // 网络可达情况下检测是否有新版本
+        if(navigator.onLine){
+            ipcRenderer.send("checkForUpdate");
+        }
+        // 收到消息
+        ipcRenderer.on("message", (event, text) => {
+          this.$Modal.info({
+            title: '检测更新',
+            content: text ,
+            width: 270 
+          });
+        });
+
+        // 下载进度
+        ipcRenderer.on("downloadProgress", (event, progressObj)=> {
+          let progress = progressObj.percent | 0;
+          this.$Modal.info({
+            title: '检测更新',
+            content: '下载进度：' + progress + '%',
+            width: 270 
+          });
+        }); 
+
+        // 安装
+        ipcRenderer.on("isUpdateNow", () => {
+            // 是否更新
+            this.$Modal.confirm({
+              title: '检测更新',
+              content: '下载完成，是否立即安装？(安装需要重启应用)',
+              okText: '更新',
+              cancelText: '取消',
+              onOk: () => {
+                ipcRenderer.send("isUpdateNow");
+                this.$Message.info('Clicked ok');
+              },
+              onCancel: () => {
+                this.$Message.info('Clicked cancel');
+              }
+          });
+        });
+
+        // 检测到新版本
+        ipcRenderer.on("updateAvailable", (event, message) => {
+          this.$Modal.confirm({
+            title: '检测更新',
+            content: message,
+            okText: '更新',
+            cancelText: '取消',
+            onOk: () => {
+              ipcRenderer.send('isDownload');
+              this.$Message.info('Clicked ok');
+            },
+            onCancel: () => {
+              this.$Message.info('Clicked cancel');
+            }
+          });
+        }); */
+
     let downloadPath = download.get('downloadPath')
-    console.log(downloadPath.txt)
     if(downloadPath && downloadPath.txt) {
       let downloadFolder = document.querySelector("#savePath")
       downloadFolder.value = downloadPath.txt
@@ -105,8 +221,16 @@
 
     },
     methods: {
-      modela() {
-        this.modal1 = true;
+      updateType() {
+        //this.$Message.success(this.vertical)
+        let upType = this.update_type
+        update.set('updateType', upType)
+      },
+      handCheckUpdate() {
+        if(navigator.onLine){
+          ipcRenderer.send("checkForUpdate");
+        }
+        ipcRenderer.send('update',"handCheckUpdate");
       },
       openFileHandler() {
         /* let downloadPath = download.get('downloadPath')
@@ -224,6 +348,15 @@
 }
 .input{
   margin: 10px 0;
+}
+.ivu-modal-header {
+  background-color: #cde;
+}
+.ivu-modal-body{
+  background-color: #cde;
+}
+.ivu-modal-footer{
+  background-color: #cde;
 }
 .input_class{
   display: inline-block;

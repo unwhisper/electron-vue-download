@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+//import { autoUpdater } from 'electron-updater'
 import Update from '../../static/update'
 
 /**
@@ -17,7 +18,11 @@ const LNDB = require('lndb')
 const db = new LNDB('./')
 
 // 初始类型
-//const downloadItems = db.init('download')
+const update = db.init('updateType')
+let updateType = update.get('updateType')
+if(!updateType || !updateType.txt) {
+  update.set('updateType','auto')
+}
 
 let mainWindow
 const winURL = process.env.NODE_ENV === 'development'
@@ -34,9 +39,19 @@ function createWindow () {
     width: 1000
   })
 
-  let update = new Update(mainWindow)
-  update.load()
-  //http://wallpaperswide.com/download/winter_nature_3-1920x1080.html?dw_url=download%2Fwinter_nature_3-&dw_ratio=hd&dlw_block_wide=960x600&dlw_block_hd=1920x1080&dlw_block_standard=800x600&dlw_block_mobile=540x960&dlw_block_dual=1920x600
+  ipcMain.on('update',(event, arg) => {
+    console.log(arg)
+    if(arg == 'update') {
+      let update = new Update(mainWindow)
+      update.autoUpdate()
+    }else if(arg == 'autoCheckUpdate') {
+      let update = new Update(mainWindow)
+      update.autoCheckUpdate()
+    }else if(arg == 'handCheckUpdate') {
+      let update = new Update(mainWindow)
+      update.handCheckUpdate()
+    }
+  })
     
   var downloadItems = new Map();
 
@@ -197,3 +212,50 @@ app.on('ready', () => {
   if (process.env.NODE_ENV === 'production') autoUpdater.checkForUpdates()
 })
  */
+// 监听检查更新出错事件
+/* autoUpdater.autoDownload = false; //默认true，禁止自动更新
+autoUpdater.setFeedURL('http://127.0.0.1/electron/download/') // 更新地址与package.json中的build.publish.url相对应
+
+autoUpdater.on('error', function (error) {
+  sendUpdateMessage('检查更新出错');
+});
+// 监听正在检查更新事件
+autoUpdater.on('checking-for-update', function () {
+  sendUpdateMessage('正在检查更新……');
+});
+// 监听不需要更新事件
+autoUpdater.on('update-not-available', function (info) {
+  sendUpdateMessage('已经是最新版本' + info.version);
+});
+// 监听需要更新事件
+autoUpdater.on('update-available', function (info) {
+  mainWindow.webContents.send('updateAvailable', '<h3>检测到新版本' + info.version + '，是否升级？</h3>');//+ info.releaseNotes
+});
+// 监听下载进度事件
+autoUpdater.on('download-progress', function (progressObj) {
+  mainWindow.webContents.send('downloadProgress', progressObj);
+})
+//监听下载完成事件
+autoUpdater.on('update-downloaded', function (info) {
+  //监听渲染线程中用户是否应用更新
+  ipcMain.on('isUpdateNow', () => {
+      autoUpdater.quitAndInstall();
+  });
+  mainWindow.webContents.send('isUpdateNow');
+});
+//监听渲染线程中用户是否同意下载
+ipcMain.on("isDownload", () => {
+  autoUpdater.downloadUpdate();
+})
+
+ipcMain.on("checkForUpdate", () => {
+  if (process.env.NODE_ENV !== 'development') {
+      //执行自动检查更新
+      autoUpdater.checkForUpdates();
+  }
+  autoUpdater.checkForUpdates();
+})
+
+function sendUpdateMessage(text) {
+mainWindow.webContents.send('message', text);
+} */

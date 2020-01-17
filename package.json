@@ -1,6 +1,6 @@
 {
-  "name": "electronDownload",
-  "version": "1.0.4",
+  "name": "electronDemo",
+  "version": "1.0.10",
   "author": "whisper57124",
   "description": "electron-vue文件下载",
   "license": "ISC",
