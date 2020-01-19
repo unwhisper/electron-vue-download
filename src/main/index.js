@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 //import { autoUpdater } from 'electron-updater'
 import Update from '../../static/update'
+const Store = require('electron-store');
+
+const store = new Store();
 
 /**
  * Set `__static` path to static files in production
@@ -14,14 +17,15 @@ const md5 = require('js-md5');
 //nodejs中的path模块
 const path=require('path');
 const fs = require('fs')
-const LNDB = require('lndb')
-const db = new LNDB('./')
 
-// 初始类型
-const update = db.init('updateType')
-let updateType = update.get('updateType')
-if(!updateType || !updateType.txt) {
-  update.set('updateType','auto')
+// 初始化更新类型和下载保存地址
+let updateType = store.get('updateType')
+if(!store.has('updateType') || !updateType) {
+  store.set('updateType','auto')
+}
+let downloadPath = store.get('downloadPath')
+if(!store.has('downloadPath') || !downloadPath) {
+  store.set('downloadPath',app.getPath('downloads'))
 }
 
 let mainWindow
@@ -39,13 +43,13 @@ function createWindow () {
     width: 1000
   })
 
+  //版本更新
   const update = new Update(mainWindow)
   ipcMain.on("checkForUpdate", () => {
-    /* if (process.env.NODE_ENV !== 'development') {
+    if (process.env.NODE_ENV !== 'development') {
         //执行自动检查更新
-        autoUpdater.checkForUpdates();
-    } */
-    update.checkUpdate()
+        update.checkUpdate()
+    }
   })
 
   ipcMain.on('update',(event, arg) => {
@@ -118,13 +122,9 @@ function createWindow () {
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
     //设置文件存放位置
     let filename = item.getFilename();
-    let name = filename.substring(0,filename.lastIndexOf("."));
-    let ext = filename.substring(filename.lastIndexOf("."));
-    //item.setSavePath(folderpath+`\\${filename}`);
     fs.stat(folderpath+`\\${filename}`, function(err, stat){
         if(stat&&stat.isFile()) {
             console.log('文件存在！');
-            
             /*let time = new Date().getTime();
             item.setSavePath(folderpath+`\\${time}${filename}`); */
             /* for(let i=1; i<3 ; i++){
@@ -206,18 +206,6 @@ app.on('activate', () => {
  * support auto updating. Code Signing with a valid certificate is required.
  * https://simulatedgreg.gitbooks.io/electron-vue/content/en/using-electron-builder.html#auto-updating
  */
-
-/*
-import { autoUpdater } from 'electron-updater'
-
-autoUpdater.on('update-downloaded', () => {
-  autoUpdater.quitAndInstall()
-})
-
-app.on('ready', () => {
-  if (process.env.NODE_ENV === 'production') autoUpdater.checkForUpdates()
-})
- */
 // 监听检查更新出错事件
 /* autoUpdater.autoDownload = false; //默认true，禁止自动更新
 autoUpdater.setFeedURL('http://127.0.0.1/electron/download/') // 更新地址与package.json中的build.publish.url相对应
@@ -259,7 +247,6 @@ ipcMain.on("checkForUpdate", () => {
       //执行自动检查更新
       autoUpdater.checkForUpdates();
   }
-  autoUpdater.checkForUpdates();
 })
 
 function sendUpdateMessage(text) {

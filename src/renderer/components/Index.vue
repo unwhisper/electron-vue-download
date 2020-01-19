@@ -55,12 +55,9 @@
   import Download from '../../../static/download.js'
   const { dialog ,shell } = require('electron').remote
   const { ipcRenderer } = require('electron')
-  const LNDB = require('lndb')
-  const db = new LNDB('./')
   const json_package = require("../../../package.json");
-  // 初始类型
-  const download = db.init('download')
-  const update = db.init('updateType')
+  const Store = require('electron-store');
+  const store = new Store();
   export default {
     name: 'Index',
     data() {
@@ -84,9 +81,9 @@
 
     // 清空类型下所有缓存
     //pg.clear()
-    let updateType = update.get('updateType')
-    if(updateType && updateType.txt) {
-      this.update_type = updateType.txt
+    let updateType = store.get('updateType')
+    if(updateType && store.has('updateType')) {
+      this.update_type = updateType
     }
 
     if(navigator.onLine){
@@ -220,10 +217,10 @@
           });
         }); */
 
-    let downloadPath = download.get('downloadPath')
-    if(downloadPath && downloadPath.txt) {
+    let downloadPath = store.get('downloadPath')
+    if(downloadPath && store.has('downloadPath')) {
       let downloadFolder = document.querySelector("#savePath")
-      downloadFolder.value = downloadPath.txt
+      downloadFolder.value = downloadPath
     }
 
     },
@@ -231,7 +228,7 @@
       updateType() {
         //this.$Message.success(this.vertical)
         let upType = this.update_type
-        update.set('updateType', upType)
+        store.set('updateType', upType)
       },
       handCheckUpdate() {
         if(navigator.onLine){
@@ -266,7 +263,7 @@
         },function(res){
           if(res){
             downloadFolder.value = res[0]
-            download.set('downloadPath',res[0])
+            store.set('downloadPath',res[0])
           }
         })
       },
