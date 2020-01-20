@@ -59,6 +59,13 @@ class Update {
     })
   }
 
+  auto_download() {
+    autoUpdater.on('update-downloaded', () => {
+      setTimeout(() => { 
+        autoUpdater.quitAndInstall() }, 1000);
+    })
+  }
+
   download () { //监听下载完成事件
     autoUpdater.on('update-downloaded', () => {
       //监听渲染线程中用户是否应用更新
@@ -83,7 +90,7 @@ class Update {
     this.error()
     this.auto_allow()
     this.listen()
-    this.download()
+    this.auto_download()
     this.isAllow_download()
   }
 
