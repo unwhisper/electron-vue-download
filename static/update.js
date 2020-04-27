@@ -14,7 +14,7 @@ class Update {
     this.mainWindow = mainWindows
     //https://www.kuk.ink/application/
     //http://127.0.0.1/electron/download/
-    autoUpdater.setFeedURL('http://127.0.0.1/electron/download/') // 更新地址与package.json中的build.publish.url相对应
+    autoUpdater.setFeedURL('https://cdn.doutui.net/sucai/application/') // 更新地址与package.json中的build.publish.url相对应
     autoUpdater.autoDownload = false; //默认true，禁止自动更新
   }
 

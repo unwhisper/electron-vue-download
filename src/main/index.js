@@ -4,6 +4,9 @@ import Update from '../../static/update'
 const Store = require('electron-store');
 
 const store = new Store();
+const request = require('request')
+const adm_zip = require('adm-zip')
+const packageJson = require('../../package.json')
 
 /**
  * Set `__static` path to static files in production
@@ -40,15 +43,18 @@ function createWindow () {
   mainWindow = new BrowserWindow({
     height: 563,
     useContentSize: true,
-    width: 1000
+    width: 1000,
+    webPreferences: {
+      nodeIntegration: true
+    }
   })
 
   //版本更新
   const update = new Update(mainWindow)
   ipcMain.on("checkForUpdate", () => {
     if (process.env.NODE_ENV !== 'development') {
-        //执行自动检查更新
-        update.checkUpdate()
+      //执行自动检查更新
+      checkVersion()
     }
   })
 
@@ -62,7 +68,44 @@ function createWindow () {
       update.handCheckUpdate()
     }
   })
+
+  function  checkVersion() {
+    return new Promise((resolve, reject) => {
+      request(
+        {
+          url: packageJson.upgrade.url + 'package.json?v=' + new Date().getTime(),//请求package.json，与本地对比版本号
+        },
+        (error, res, body) => {
+          try {
+            if (error || res.statusCode !== 200) {
+              throw '更新版本号失败，请联系管理员';
+            }
+            const json = JSON.parse(body);
+            const { version, description, upgrade } = json
+            const localCoreVersion = packageJson.version
+            const localVersion = packageJson.upgrade.version
+            const onlineCoreVersion = version
+            const onlineVersion = upgrade.version
+            // console.log(localCoreVersion, localVersion, onlineCoreVersion, onlineVersion)
+            if(onlineCoreVersion > localCoreVersion) {
+              update.checkUpdate()
+            }else{
+              if(onlineVersion > localVersion) {
+                mainWindow.webContents.send('hotUpdate');
+              }
+              console.log('no update')
+            }
+          } catch (err) {
+            reject(err);
+          }
+        })
+    })
+  }
     
+  ipcMain.on('hotUpdateNow', (event, arg) => {
+    downLoad()
+  })
+
   var downloadItems = new Map();
 
   function getDownloadItem(downloadpath) {
@@ -72,6 +115,22 @@ function createWindow () {
     }else{
       return false;
     }
+  }
+
+    /**
+   * 更新
+   */
+  function downLoad(){
+    const baseUrl = './resources/'
+    const fileUrl = packageJson.upgrade.url
+    const stream = fs.createWriteStream(`${baseUrl}dist.zip`);
+    const url = `${fileUrl}dist.zip?v=${new Date().getTime()}`;
+    request(url).pipe(stream).on('close', () => {
+      const unzip = new adm_zip(`${baseUrl}dist.zip`);   //下载压缩更新包
+      unzip.extractAllTo(`${baseUrl}`, true);   //解压替换本地文件
+      fs.unlink(`${baseUrl}dist.zip`, function() {})
+      mainWindow.webContents.send('upgradeSuccess')
+    });
   }
 
   //主进程代码
@@ -186,6 +245,7 @@ function createWindow () {
 }
 
 app.on('ready', createWindow)
+app.allowRendererProcessReuse = false
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

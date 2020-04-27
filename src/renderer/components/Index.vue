@@ -53,7 +53,7 @@
 
 <script>
   import Download from '../../../static/download.js'
-  const { dialog ,shell } = require('electron').remote
+  const { dialog ,shell,app } = require('electron').remote
   const { ipcRenderer } = require('electron')
   const json_package = require("../../../package.json");
   const Store = require('electron-store');
@@ -157,6 +157,42 @@
         width: 270 
       });
       ipcRenderer.send('isDownload');
+    });
+
+    /**
+     * 热更新
+     */
+    ipcRenderer.on("hotUpdate", () => {
+        // 是否更新
+        this.$Modal.confirm({
+          title: '检测更新',
+          content: '请点击按钮进行更新，更新后重启生效',
+          okText: '立即更新',
+          cancelText: '下次更新',
+          onOk: () => {
+            ipcRenderer.send("hotUpdateNow");
+            this.$Message.info('Clicked ok');
+          },
+          onCancel: () => {
+            this.$Message.info('Clicked cancel');
+          }
+      });
+    });
+
+    ipcRenderer.on("upgradeSuccess", () => {
+        // 是否更新
+        this.$Modal.confirm({
+          title: '更新成功',
+          content: '重新启动体验新版本',
+          okText: '立即重启',
+          cancelText: '暂不重启',
+          onOk: () => {
+            app.relaunch()
+            app.exit(0)
+          },
+          onCancel: () => {
+          }
+      });
     });
 
     /* // 网络可达情况下检测是否有新版本
