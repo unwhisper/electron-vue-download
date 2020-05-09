@@ -178,62 +178,89 @@ function createWindow () {
       }   
   });
 
-  mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
-    //设置文件存放位置
-    let filename = item.getFilename();
-    fs.stat(folderpath+`\\${filename}`, function(err, stat){
-        if(stat&&stat.isFile()) {
-            console.log('文件存在！');
-            /*let time = new Date().getTime();
-            item.setSavePath(folderpath+`\\${time}${filename}`); */
-            /* for(let i=1; i<3 ; i++){
-              let new_path = name+'('+i+')'+ext
-              fs.stat(new_path, (err, stats)=>{
-                if(!stats) {
-                  item.setSavePath(new_path);
-                  // break;
-                  console.log(i);
-                }
-              })
-            } */
-        } else {
-            item.setSavePath(folderpath+`\\${filename}`);
-        }
-    })
-    downloadItems.set(md5(item.getURL()),item);
-    console.log(item.getURL())
+  mainWindow.webContents.session.on('will-download', async (event, item) => {
+    const fileName = item.getFilename();
+    const url = item.getURL();
+    const time = item.getStartTime();
+    const startTime = time.toString().split('.')[0]
+    const initialState = item.getState();
+    const downloadPath = store.get('downloadPath')
+ 
+    let fileNum = 0;
+    let savePath = path.join(downloadPath, fileName);
+ 
+    // savePath基础信息
+    const ext = path.extname(savePath);
+    const name = path.basename(savePath, ext);
+    const dir = path.dirname(savePath);
+ 
+    // 文件名自增逻辑
+    while (fs.existsSync(savePath)) {
+      fileNum += 1;
+      savePath = path.format({
+        dir: dir,
+        ext: ext,
+        name: `${name}(${fileNum})`,
+      });
+    }
+ 
+    // 设置下载目录，阻止系统dialog的出现
+    item.setSavePath(savePath);
+    // 通知渲染进程，有一个新的下载任务
+    mainWindow.webContents.send('new-download-item', {
+      savePath,
+      url,
+      startTime,
+      state: initialState,
+      paused: item.isPaused(),
+      totalBytes: item.getTotalBytes(),
+      receivedBytes: item.getReceivedBytes(),
+      progressShow: true
+    });
 
     item.on('updated', (event, state) => {
-        if (state === 'interrupted') {
+      mainWindow.webContents.send('download-item-updated', {
+        startTime,
+        state,
+        totalBytes: item.getTotalBytes(),
+        receivedBytes: item.getReceivedBytes(),
+        paused: item.isPaused()
+      });
+      if (state === 'interrupted') {
         console.log('下载中断但可以恢复！')
-        } else if (state === 'progressing') {
-            if (item.isPaused()) {
-                console.log('下载已暂停')
-            } else {
-                /* downloadItem.getTotalBytes()
-                返回Integer- 下载项目的总大小（以字节为单位）。
+      } else if (state === 'progressing') {
+        if (item.isPaused()) {
+          console.log('下载已暂停')
+        } else {
+          /* downloadItem.getTotalBytes()
+          返回Integer- 下载项目的总大小（以字节为单位）。
 
-                如果大小未知，则返回0。
+          如果大小未知，则返回0。
 
-                downloadItem.getReceivedBytes()
-                返回Integer- 下载项目的接收字节数。 */
-                //console.log(`Received bytes: ${item.getReceivedBytes()}`)
-                let download_percent = ((item.getReceivedBytes()/item.getTotalBytes())*100).toFixed(2);
-                console.log(download_percent+'%');
-                mainWindow.webContents.send('tips',download_percent);
-            }
+          downloadItem.getReceivedBytes()
+          返回Integer- 下载项目的接收字节数。 */
+          //console.log(`Received bytes: ${item.getReceivedBytes()}`)
+          let download_percent = ((item.getReceivedBytes()/item.getTotalBytes())*100).toFixed(2);
+          console.log(download_percent+'%');
+          mainWindow.webContents.send('tips',download_percent);
         }
+      }
     })
     item.once('done', (event, state) => {
-        if (state === 'completed') {
+      mainWindow.webContents.send('download-item-done', {
+        startTime,
+        state,
+        progressShow: false
+      });
+      if (state === 'completed') {
         console.log('下载完成！')
         console.log(item.getSavePath())
         downloadItems.delete(md5(item.getURL()))
         mainWindow.webContents.send('tips', '下载完成')
         mainWindow.webContents.send('file', item.getSavePath())
-        } else {
+      } else {
         console.log(`下载失败: ${state}`)
-        }
+      }
     })
   })
 

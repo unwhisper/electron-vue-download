@@ -1,65 +1,88 @@
 <template>
 <div class="content">
-  <div class="input">
-    <label for="downloadUrl">下载地址:</label>
-    <input placeholder="下载地址" name="downloadUrl" class="input_class" id="downloadUrl" style="width: 300px" />
-  </div>
-  <div class="input">
-    <label>保存地址:</label>
-    <input type="text" name="savePath" id="savePath" class="input_class" style="width: 300px" readonly />
-    <Button type="primary" id="changePath" @click="choosePath">选择文件夹</Button>
-  </div>
-  <div class="input">
-    <label>更新方式:</label>
-    <RadioGroup v-model="update_type" @on-change="updateType" vertical>
-        <Radio label="auto">
-            <Icon type="social-auto"></Icon>
-            <span>自动更新</span>
-        </Radio>
-        <Radio label="tips">
-            <Icon type="social-tips"></Icon>
-            <span>新版本提示更新</span>
-        </Radio>
-    </RadioGroup>
-  </div>
-  <div class="input">
-    <Button type="success" size="small" id="download" ghost icon="md-download" @click="startDownload"></Button>
-    <Button type="error" size="small" id="stop" ghost icon="md-pause" @click="stopDownload"></Button>
-    <Button type="info" size="small" id="start" ghost icon="md-play" @click="resumeDownload"></Button>
-    <Button type="warning" size="small" id="cancel" ghost @click="cancelDownload">取消下载</Button>
-  </div>
-  <div class="input" style="display:flex;align-items: center;">
-    <div>
-      <Circle :percent="percent" :stroke-color="color" :size="60">
-        <Icon v-if="percent == 100" type="ios-checkmark" size="60" style="color:#5cb85c"></Icon>
-        <span v-else style="font-size:14px">{{percents}}%</span>
-      </Circle>
-    </div>
-    <div style="margin-left:20px;">
-      <Button type="info" @click="openFile">打开文件</Button>
-      <Button type="info" @click="openFileHandler">打开文件夹</Button>
-    </div>
-    <div>
-      版本：{{version}}
-    </div>
-    <div>
-    <!-- <Button type="primary" @click="modela">普通组件使用方法</Button> -->
-    <Button type="primary" @click="handCheckUpdate">检测更新</Button>
-    
-  </div>
-  </div>
+  <Row>
+    <Col span="12">
+      <div class="input">
+        <label for="downloadUrl">下载地址:</label>
+        <input placeholder="下载地址" name="downloadUrl" class="input_class" id="downloadUrl" style="width: 300px" />
+      </div>
+      <div class="input">
+        <label>保存地址:</label>
+        <input type="text" name="savePath" id="savePath" class="input_class" style="width: 300px" readonly />
+        <Button type="primary" id="changePath" @click="choosePath">选择文件夹</Button>
+      </div>
+      <div class="input">
+        <label>更新方式:</label>
+        <RadioGroup v-model="update_type" @on-change="updateType" vertical>
+            <Radio label="auto">
+                <Icon type="social-auto"></Icon>
+                <span>自动更新</span>
+            </Radio>
+            <Radio label="tips">
+                <Icon type="social-tips"></Icon>
+                <span>新版本提示更新</span>
+            </Radio>
+        </RadioGroup>
+      </div>
+      <div class="input">
+        <Button type="success" size="small" id="download" ghost icon="md-download" @click="startDownload"></Button>
+        <Button type="error" size="small" id="stop" ghost icon="md-pause" @click="stopDownload"></Button>
+        <Button type="info" size="small" id="start" ghost icon="md-play" @click="resumeDownload"></Button>
+        <Button type="warning" size="small" id="cancel" ghost @click="cancelDownload">取消下载</Button>
+      </div>
+      <div class="input" style="display:flex;align-items: center;">
+        <div>
+          <Circle :percent="percent" :stroke-color="color" :size="60">
+            <Icon v-if="percent == 100" type="ios-checkmark" size="60" style="color:#5cb85c"></Icon>
+            <span v-else style="font-size:14px">{{percents}}%</span>
+          </Circle>
+        </div>
+        <div style="margin-left:20px;">
+          <Button type="info" @click="openFile">打开文件</Button>
+          <Button type="info" @click="openFileHandler">打开文件夹</Button>
+        </div>
+        <div>
+          版本：{{version}}
+        </div>
+        <div>
+        <!-- <Button type="primary" @click="modela">普通组件使用方法</Button> -->
+        <Button type="primary" @click="handCheckUpdate">检测更新</Button>
+        
+      </div>
+      </div>
+    </Col>
+    <Col span="12">
+      <div>
+        <div class="downdiv" @click="openDownload">
+          <img src="../../../static/image/48.png" class="downicon" alt="">
+        </div>
+        <Dowmload :dowmloadShow="dowmloadShow" :client="client" :dowmload_data="dowmload_data"></Dowmload>
+      </div>
+    </Col>
+  </Row>
 </div>
 </template>
 
 <script>
   import Download from '../../../static/download.js'
+  import Dowmload from '@/components/dowmload.vue';
   const { dialog ,shell,app } = require('electron').remote
   const { ipcRenderer } = require('electron')
   const json_package = require("../../../package.json");
   const Store = require('electron-store');
   const store = new Store();
+  const nedb = require('nedb')
+  const fs= require('fs')
+  // 初始化 nedb 数据库
+  const db = new nedb({
+    filename: app.getPath('userData') + '/download.db',
+    autoload: true
+  });
   export default {
     name: 'Index',
+    components:{
+      Dowmload
+    },
     data() {
       return {
         percent: 0,
@@ -67,10 +90,49 @@
         color: '#2db7f5',
         file_path: '',
         version: json_package.version,      
-        update_type: ''
+        update_type: '',
+        // 弹窗组件化
+        dowmloadShow: false,
+        client:{
+          top: 0,
+          left: 0
+        },
+        dowmload_data:[]
       }
     },
     mounted() {
+    document.addEventListener('click',()=>{
+      if(this.dowmloadShow){
+        this.dowmloadShow = false;
+      }
+    })
+    // 渲染进程中
+    this.init()
+    ipcRenderer.on('new-download-item', (e, item) => {
+        // 数据库新增一条新纪录
+        db.insert(item);
+        
+        // UI中新增一条下载任务
+        this.init()
+    })
+    
+    // 更新下载窗口的任务进度
+    ipcRenderer.on('download-item-updated', (e, item) => {
+      db.update({startTime: item.startTime}, {$set: item});
+      let percent = item.getReceivedBytes() / item.getTotalBytes();
+        // this.updateItem(item)
+    })
+    
+    
+    // 下载结束，更新数据
+    ipcRenderer.on('download-item-done', (e, item) => {
+        // 更新数据库
+        db.update({startTime: item.startTime}, {$set: item});
+        this.init()
+        
+        // 更新UI中下载任务状态
+        // this.updateItem(item);
+    });
     //pg.set('key', {hello: 'lndb!'})
 
     // 读取类型信息
@@ -261,6 +323,27 @@
 
     },
     methods: {
+      timestampToTime(timestamp) {
+        var date = new Date(timestamp * 1000);//时间戳为10位需*1000，时间戳为13位的话不需乘1000
+        var Y = date.getFullYear() + '-';
+        var M = (date.getMonth() + 1) + '-';
+        var D = date.getDate() + ' ';
+        var h = date.getHours() + ':';
+        var m = date.getMinutes() + ':';
+        var s = date.getSeconds();
+        return Y + M + D + h + m + s;
+      },
+      computeSize(fileByte) {
+        var fileSizeByte = fileByte;
+        var fileSizeMsg = "";
+        if (fileSizeByte < 1048576) fileSizeMsg = (fileSizeByte / 1024).toFixed(2) + "KB";
+        else if (fileSizeByte == 1048576) fileSizeMsg = "1MB";
+        else if (fileSizeByte > 1048576 && fileSizeByte < 1073741824) fileSizeMsg = (fileSizeByte / (1024 * 1024)).toFixed(2) + "MB";
+        else if (fileSizeByte > 1048576 && fileSizeByte == 1073741824) fileSizeMsg = "1GB";
+        else if (fileSizeByte > 1073741824 && fileSizeByte < 1099511627776) fileSizeMsg = (fileSizeByte / (1024 * 1024 * 1024)).toFixed(2) + "GB";
+        else fileSizeMsg = "文件超过1TB";
+        return fileSizeMsg;
+      },
       updateType() {
         //this.$Message.success(this.vertical)
         let upType = this.update_type
@@ -296,11 +379,13 @@
           filters: [
               { name: 'All', extensions: ['*'] },
           ]
-        },function(res){
-          if(res){
-            downloadFolder.value = res[0]
-            store.set('downloadPath',res[0])
+        }).then(result => {
+          if (result.canceled === false) {
+            downloadFolder.value = result.filePaths[0]
+            store.set('downloadPath',result.filePaths[0])
           }
+        }).catch(err => {
+          console.log(err)
         })
       },
       /**
@@ -375,8 +460,54 @@
               savePath: downloadFolder.value,
               command: 'cancelDownload'
             }));
-      }
+      },
 
+      openDownload(e) {
+        this.dowmloadShow = !this.dowmloadShow;
+        e.stopPropagation();
+        this.client.top = e.clientX;
+        this.client.left = e.clientY;
+      },
+      init() {
+        // 读取历史数据
+        db.find({}).sort({
+          startTime: -1,
+        }).limit(50).exec((err, ret) => {
+          if (ret) {
+          /* this.setList(downloadHistory.map((d) => {
+            const item = d;
+            // 历史记录中，只有需要未完成和完成两个状态
+            if (item.state !== 'completed') { 
+              item.state = 'cancelled';
+            }
+            return item;
+          })); */
+          for(let key in ret) {
+            let filename = ret[key].savePath.split('\\').pop()
+            ret[key].filename = filename
+            ret[key].startTime = this.timestampToTime(ret[key].startTime)
+            ret[key].overMouse = false
+            ret[key].percent = 0
+            ret[key].totalBytes = this.computeSize(ret[key].totalBytes)
+            ret[key].receivedBytes = this.computeSize(ret[key].receivedBytes)
+            const defaultIcon = '../assets/images/yasuo.png';
+            if (!ret[key].savePath) {
+              ret[key].icon =  defaultIcon
+            }else{
+              app.getFileIcon(ret[key].savePath).then((nativeImage) => {
+                // console.log(nativeImage.toDataURL())
+                ret[key].icon =  nativeImage.toDataURL()
+              }).catch(err => {
+                ret[key].icon =  defaultIcon
+                console.log(err)
+              })
+            }   
+          }
+          this.dowmload_data = ret
+          console.log(ret)
+        }
+        })
+      }
     }
   }
 </script>
@@ -412,5 +543,19 @@
   background-image: none;
   position: relative;
   cursor: text;
+}
+.downdiv{
+  width:36px;
+  height:36px;
+  cursor: pointer;
+}
+.downdiv:hover {
+  background-color: rgba(203, 231, 233, 0.5);
+  border-radius: 50%;
+}
+.downicon{
+  width: 26px;
+  height: 26px;
+  margin: 5px;
 }
 </style>
