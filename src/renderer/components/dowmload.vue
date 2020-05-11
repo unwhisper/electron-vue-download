@@ -5,15 +5,22 @@
                 下载管理
             </div>
             <div class="header_right">
-                <img src="../assets/images/clear.png" alt="">
+                <img src="../assets/images/clear.png" id="headerImg" title="清除任务" class="pointer" @click="removeAll" alt="">
             </div>
+        </div>
+        <div class="removeall" v-if="clear">
+            <List border style="width:200px;">
+                <ListItem ea="remove">This is a piece of text.</ListItem>
+                <ListItem ea="remove">This is a piece of text.</ListItem>
+                <ListItem ea="remove">This is a piece of text.</ListItem>
+            </List>
         </div>
 
         <div class="dowmload_content">
             <div class="dowmload_content_item" v-for="(item,index) in dowmload_data" :key='index' @mouseover="dataOver(index)" @mouseleave="dataOut(index)" :style="{backgroundColor:(item.overMouse?'#F3F8FD':'')}">
                 <div class="content_left">
                     <div v-if="item.progressShow">
-                        <Circle :percent="item.percent" :stroke-color="color" :stroke-width="10" :trail-width="8" :size="60">
+                        <Circle :percent="item.percent" :stroke-color="color" :stroke-width="8" :trail-width="8" :size="60">
                             <img :src="item.icon" alt="">
                         </Circle>
                     </div>
@@ -25,13 +32,28 @@
                     <div class="content_right_title">{{item.filename}}</div>
                     <div class="content_right_link">{{item.url}}</div>
                     <div class="content_right_info" v-if="!item.overMouse">
-                        <div class="content_right_info_size">{{item.totalBytes}}</div>
+                        <div class="content_right_info_size" v-if="item.state == 'progressing'"><Icon type="ios-download" color="#5EB1F0"/>{{item.receivedBytes}}/{{item.totalBytes}}</div>
+                        <div class="content_right_info_size" v-else>{{item.totalBytes}}</div>
                         <div class="content_right_info_time">{{item.startTime}}</div>
                     </div>
                     <div class="content_right_info_hover" v-else-if="item.overMouse">
-                        <img src="../assets/images/file.png" alt="">
-                        <img src="../assets/images/refresh.png" alt="">
-                        <img src="../assets/images/delete.png" alt="">
+                        <div class='border'>
+                            <img src="../assets/images/file.png" title="打开所在文件夹" @click="openFileHandler(item.savePath)" alt="">
+                        </div>
+                        <div v-if="item.state == 'progressing'" class='border'>
+                            <div v-if="item.paused == false" class='icon'>
+                                <Icon type="md-pause" color="#131414" size="20" title="暂停" @click="stop(item.startTime)" style="line-height:20px"/>
+                            </div>
+                            <div v-else class='icon'>
+                                <Icon type="md-play" color="#131414" size="20" title="开始" @click="start(item.startTime)" style="line-height:20px"/>
+                            </div>
+                        </div>
+                        <div class='border'>
+                            <img src="../assets/images/refresh.png" title="重新开始" alt="">
+                        </div>
+                        <div class='border'>
+                            <img src="../assets/images/delete.png" @click="cancle(item.startTime, item.state)" title="移除" alt="">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -40,6 +62,8 @@
 </template>
 
 <script>
+  const { ipcRenderer } = require('electron')
+  const { shell } = require('electron').remote
     export default {
         props:{
             dowmloadShow:{
@@ -59,20 +83,53 @@
         data() {
             return {
                 color: '#2db7f5',
+                clear: false
             }
         },
         methods: {
             dowmloadBox:function(e){
                 e.stopPropagation();
+                var el = e.target
+                var id = el.getAttribute('id')
+                var ea = el.getAttribute('ea')
+                if(id !== 'headerImg' && ea !== 'remove') {
+                    this.clear = false
+                }
             },
             dataOver:function(index){
-                for(let ind in this.dowmload_data){
-                    this.dowmload_data[ind].overMouse = false;
-                }
                 this.dowmload_data[index].overMouse = true;
             },
             dataOut:function(index){
                 this.dowmload_data[index].overMouse = false;
+            },
+            stop(startTime) {
+                var date = new Date(startTime)
+                var time = date.getTime()/1000
+                time = time.toString()
+                ipcRenderer.send('stopDownload', time)
+            },
+            start(startTime) {
+                var date = new Date(startTime)
+                var time = date.getTime()/1000
+                time = time.toString()
+                ipcRenderer.send('startDownload', time)
+            },
+            cancle(startTime, state) {
+                var date = new Date(startTime)
+                var time = date.getTime()/1000
+                time = time.toString()
+                ipcRenderer.send('cancleDownload', {time: time, state: state})
+            },
+            openFileHandler(filePath) {
+                console.log(filePath)
+                shell.showItemInFolder(filePath);
+            },
+            removeAll() {
+                if(this.clear == false) {
+                    this.clear = true
+                }else{
+                    this.clear = false
+                }
             }
         },
     }
@@ -168,10 +225,34 @@
     }
     .dowmload_content .dowmload_content_item .content_right .content_right_info_hover{
         height: 20px;
+        display: flex;
+        align-items: center;
     }
     .dowmload_content .dowmload_content_item .content_right .content_right_info_hover img{
         width: 20px;
         height: 20px;
-        margin-right: 15px;
+        margin: 5px;
+    }
+    .border{
+        width: 30px;
+        height: 30px;
+        margin-right: 5px;
+    }
+    .dowmload_content .dowmload_content_item .content_right .content_right_info_hover .border:hover{
+        background-color: #c7d2d4;
+        border-radius: 50%;
+    }
+    .pointer{
+        cursor: pointer;
+    }
+    .icon{
+        margin: 2.5px 5px;
+    }
+    .removeall{
+        position: absolute;
+        top: 50px;
+        right: 20px;
+        z-index:999;
+        background:#FFF;
     }
 </style>

@@ -5,6 +5,7 @@
       <div class="input">
         <label for="downloadUrl">下载地址:</label>
         <input placeholder="下载地址" name="downloadUrl" class="input_class" id="downloadUrl" style="width: 300px" />
+        <Button type="success" size="small" id="download" ghost icon="md-download" @click="startDownload"></Button>
       </div>
       <div class="input">
         <label>保存地址:</label>
@@ -24,23 +25,7 @@
             </Radio>
         </RadioGroup>
       </div>
-      <div class="input">
-        <Button type="success" size="small" id="download" ghost icon="md-download" @click="startDownload"></Button>
-        <Button type="error" size="small" id="stop" ghost icon="md-pause" @click="stopDownload"></Button>
-        <Button type="info" size="small" id="start" ghost icon="md-play" @click="resumeDownload"></Button>
-        <Button type="warning" size="small" id="cancel" ghost @click="cancelDownload">取消下载</Button>
-      </div>
       <div class="input" style="display:flex;align-items: center;">
-        <div>
-          <Circle :percent="percent" :stroke-color="color" :size="60">
-            <Icon v-if="percent == 100" type="ios-checkmark" size="60" style="color:#5cb85c"></Icon>
-            <span v-else style="font-size:14px">{{percents}}%</span>
-          </Circle>
-        </div>
-        <div style="margin-left:20px;">
-          <Button type="info" @click="openFile">打开文件</Button>
-          <Button type="info" @click="openFileHandler">打开文件夹</Button>
-        </div>
         <div>
           版本：{{version}}
         </div>
@@ -113,26 +98,69 @@
         db.insert(item);
         
         // UI中新增一条下载任务
-        this.init()
+        this.addItem(item)
     })
     
     // 更新下载窗口的任务进度
     ipcRenderer.on('download-item-updated', (e, item) => {
       db.update({startTime: item.startTime}, {$set: item});
-      let percent = item.getReceivedBytes() / item.getTotalBytes();
-        // this.updateItem(item)
+      let percent = Number(((item.receivedBytes / item.totalBytes) * 100).toFixed(2));
+      this.dowmload_data.map((data) => {
+        if(this.timestampToTime(item.startTime) == data.startTime) {
+          data.percent = percent
+          data.state = item.state
+          data.totalBytes = this.computeSize(item.totalBytes)
+          data.receivedBytes = this.computeSize(item.receivedBytes)
+          data.paused = item.paused
+        }
+      })
     })
     
     
     // 下载结束，更新数据
     ipcRenderer.on('download-item-done', (e, item) => {
+      if(item.state == 'cancelled'){
+        for(let key in this.dowmload_data) {
+          var date = new Date(this.dowmload_data[key].startTime)
+          var time = date.getTime()/1000
+          time = time.toString()
+          if(time == item.startTime) {
+            this.dowmload_data.splice(key, 1);
+            break
+          }
+        }
+        console.log(this.dowmload_data)
+        db.remove({startTime: item.startTime})
+      }else{
         // 更新数据库
         db.update({startTime: item.startTime}, {$set: item});
-        this.init()
-        
-        // 更新UI中下载任务状态
-        // this.updateItem(item);
+        this.dowmload_data.map((data) => {
+          if(this.timestampToTime(item.startTime) == data.startTime) {
+            data.percent = 100
+            data.state = item.state
+            data.progressShow = false
+            app.getFileIcon(item.savePath).then((nativeImage) => {
+              data.icon =  nativeImage.toDataURL()
+            }).catch(err => {
+              console.log(err)
+            })
+          }
+        })
+      }
     });
+
+    ipcRenderer.on('removeRecord', (e, arg) => {
+      for(let key in this.dowmload_data) {
+        var date = new Date(this.dowmload_data[key].startTime)
+        var time = date.getTime()/1000
+        time = time.toString()
+        if(time == arg) {
+          this.dowmload_data.splice(key, 1);
+          break
+        }
+      }
+      db.remove({startTime: arg})
+    })
     //pg.set('key', {hello: 'lndb!'})
 
     // 读取类型信息
@@ -344,6 +372,13 @@
         else fileSizeMsg = "文件超过1TB";
         return fileSizeMsg;
       },
+      addItem(item) {
+        let data = {}
+        let filename = item.savePath.split('\\').pop()
+        let defaultIcon = require('../assets/images/default.png');
+        data = {'filename': filename, 'savePath': item.savePath, 'url': item.url, 'state': item.state, 'paused': item.paused, 'startTime': this.timestampToTime(item.startTime), 'overMouse': false, 'percent': 0, 'totalBytes': this.computeSize(item.totalBytes), 'receivedBytes': this.computeSize(item.receivedBytes), 'icon': defaultIcon, progressShow: item.progressShow}
+        this.dowmload_data.unshift(data)
+      },
       updateType() {
         //this.$Message.success(this.vertical)
         let upType = this.update_type
@@ -423,44 +458,6 @@
             alert("未选择文件夹")
         }
       },
-      /**
-       * 暂停下载
-       */
-      stopDownload() {
-        let downloadAddress = document.querySelector('#downloadUrl')
-        let downloadFolder = document.querySelector("#savePath")
-        ipcRenderer.send('download',JSON.stringify({
-              downloadUrl: downloadAddress.value,
-              savePath: downloadFolder.value,
-              command: 'stopDownload'
-            }));
-      },
-
-      /**
-       * 继续下载
-       */
-      resumeDownload() {
-        let downloadAddress = document.querySelector('#downloadUrl')
-        let downloadFolder = document.querySelector("#savePath")
-        ipcRenderer.send('download',JSON.stringify({
-              downloadUrl: downloadAddress.value,
-              savePath: downloadFolder.value,
-              command: 'resumeDownload'
-            }));
-      },
-
-      /**
-       * 取消下载
-       */
-      cancelDownload() {
-        let downloadAddress = document.querySelector('#downloadUrl')
-        let downloadFolder = document.querySelector("#savePath")
-        ipcRenderer.send('download',JSON.stringify({
-              downloadUrl: downloadAddress.value,
-              savePath: downloadFolder.value,
-              command: 'cancelDownload'
-            }));
-      },
 
       openDownload(e) {
         this.dowmloadShow = !this.dowmloadShow;
@@ -487,10 +484,10 @@
             ret[key].filename = filename
             ret[key].startTime = this.timestampToTime(ret[key].startTime)
             ret[key].overMouse = false
-            ret[key].percent = 0
-            ret[key].totalBytes = this.computeSize(ret[key].totalBytes)
+            ret[key].percent = Number(((ret[key].receivedBytes / ret[key].receivedBytes) * 100).toFixed(2))
+            ret[key].totalBytes = this.computeSize(ret[key].receivedBytes)
             ret[key].receivedBytes = this.computeSize(ret[key].receivedBytes)
-            const defaultIcon = '../assets/images/yasuo.png';
+            const defaultIcon = require('../assets/images/default.png');
             if (!ret[key].savePath) {
               ret[key].icon =  defaultIcon
             }else{

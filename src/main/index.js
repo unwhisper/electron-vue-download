@@ -108,9 +108,9 @@ function createWindow () {
 
   var downloadItems = new Map();
 
-  function getDownloadItem(downloadpath) {
-    if(downloadItems.has(md5(downloadpath))){
-      var item = downloadItems.get(md5(downloadpath));
+  function getDownloadItem(key) {
+    if(downloadItems.has(key)){
+      var item = downloadItems.get(key);
       return item;
     }else{
       return false;
@@ -148,35 +148,33 @@ function createWindow () {
           mainWindow.webContents.downloadURL(downloadUrl);
           return ;
       }
-
-      //暂停下载
-      if(command === 'stopDownload') {
-          var item = getDownloadItem(downloadUrl);
-          if(item && !item.isPaused()){
-              item.pause();
-              return ;
-          }
-      }
-
-      //恢复下载
-      if(command === 'resumeDownload') {
-          var item = getDownloadItem(downloadUrl);
-          if(item && item.isPaused()) {
-              item.resume();
-              return ;
-          }
-      }
-
-      //取消下载
-      if(command === 'cancelDownload') {
-        var item = getDownloadItem(downloadUrl);
-        if(item){
-          item.cancel();
-          downloadItems.delete(md5(item.getURL()))
-          return ;
-        }
-      }   
   });
+  ipcMain.on('stopDownload', (event, args) => {
+    var item = getDownloadItem(args);
+    console.log(item)
+    if(item && !item.isPaused()){
+        item.pause();
+        return ;
+    }
+  })
+  ipcMain.on('startDownload', (event, args) => {
+    var item = getDownloadItem(args);
+    if(item && item.isPaused()) {
+        item.resume();
+        return ;
+    }
+  })
+  ipcMain.on('cancleDownload', (event, args) => {
+    if(args.state != 'completed') {
+      var item = getDownloadItem(args.time);
+      if(item){
+        item.cancel();
+        downloadItems.delete(args.time)
+        return ;
+      }
+    }
+    mainWindow.webContents.send('removeRecord', args.time)
+  })
 
   mainWindow.webContents.session.on('will-download', async (event, item) => {
     const fileName = item.getFilename();
@@ -203,7 +201,8 @@ function createWindow () {
         name: `${name}(${fileNum})`,
       });
     }
- 
+
+    downloadItems.set(startTime, item)
     // 设置下载目录，阻止系统dialog的出现
     item.setSavePath(savePath);
     // 通知渲染进程，有一个新的下载任务
@@ -226,41 +225,14 @@ function createWindow () {
         receivedBytes: item.getReceivedBytes(),
         paused: item.isPaused()
       });
-      if (state === 'interrupted') {
-        console.log('下载中断但可以恢复！')
-      } else if (state === 'progressing') {
-        if (item.isPaused()) {
-          console.log('下载已暂停')
-        } else {
-          /* downloadItem.getTotalBytes()
-          返回Integer- 下载项目的总大小（以字节为单位）。
-
-          如果大小未知，则返回0。
-
-          downloadItem.getReceivedBytes()
-          返回Integer- 下载项目的接收字节数。 */
-          //console.log(`Received bytes: ${item.getReceivedBytes()}`)
-          let download_percent = ((item.getReceivedBytes()/item.getTotalBytes())*100).toFixed(2);
-          console.log(download_percent+'%');
-          mainWindow.webContents.send('tips',download_percent);
-        }
-      }
     })
     item.once('done', (event, state) => {
       mainWindow.webContents.send('download-item-done', {
+        savePath,
         startTime,
         state,
         progressShow: false
       });
-      if (state === 'completed') {
-        console.log('下载完成！')
-        console.log(item.getSavePath())
-        downloadItems.delete(md5(item.getURL()))
-        mainWindow.webContents.send('tips', '下载完成')
-        mainWindow.webContents.send('file', item.getSavePath())
-      } else {
-        console.log(`下载失败: ${state}`)
-      }
     })
   })
 
