@@ -41,7 +41,13 @@
         <div class="downdiv" @click="openDownload">
           <img src="../../../static/image/48.png" class="downicon" alt="">
         </div>
-        <Dowmload :dowmloadShow="dowmloadShow" :client="client" :dowmload_data="dowmload_data"></Dowmload>
+        <audio id="finish">
+          <source src="../../../static/finish.ogg" type="audio/ogg">
+        </audio>
+        <audio id="error">
+          <source src="../../../static/error.ogg" type="audio/ogg">
+        </audio>
+        <Dowmload ref="dowmloadSon" :dowmloadShow="dowmloadShow" :client="client" :dowmload_data="dowmload_data"></Dowmload>
       </div>
     </Col>
   </Row>
@@ -103,6 +109,10 @@
     
     // 更新下载窗口的任务进度
     ipcRenderer.on('download-item-updated', (e, item) => {
+      if(item.state == 'interrupted') {
+        let audio = document.querySelector('#error');
+        audio.play();
+      }
       db.update({startTime: item.startTime}, {$set: item});
       let percent = Number(((item.receivedBytes / item.totalBytes) * 100).toFixed(2));
       this.dowmload_data.map((data) => {
@@ -129,9 +139,8 @@
             break
           }
         }
-        console.log(this.dowmload_data)
         db.remove({startTime: item.startTime})
-      }else{
+      }else if(item.state == 'completed'){
         // 更新数据库
         db.update({startTime: item.startTime}, {$set: item});
         this.dowmload_data.map((data) => {
@@ -139,6 +148,7 @@
             data.percent = 100
             data.state = item.state
             data.progressShow = false
+            data.fileExists = fs.existsSync(item.savePath)
             app.getFileIcon(item.savePath).then((nativeImage) => {
               data.icon =  nativeImage.toDataURL()
             }).catch(err => {
@@ -146,6 +156,11 @@
             })
           }
         })
+        let audio = document.querySelector('#finish');
+        audio.play();
+      }else{
+        let audio = document.querySelector('#error');
+        audio.play();
       }
     });
 
@@ -160,6 +175,40 @@
         }
       }
       db.remove({startTime: arg})
+    })
+    ipcRenderer.on('refresh', (e, arg) => {
+      for(let key in this.dowmload_data) {
+        var date = new Date(this.dowmload_data[key].startTime)
+        var time = date.getTime()/1000
+        time = time.toString()
+        if(time == arg) {
+          this.dowmload_data[key].fileExists = fs.existsSync(this.dowmload_data[key].savePath)
+          break
+        }
+      }
+    })
+    ipcRenderer.on('clearNoFile', () => {
+      db.find({}).exec((err, ret) => {
+        if(ret) {
+          for(let key in ret) {
+            if(!fs.existsSync(ret[key].savePath)) {
+              db.remove({startTime: ret[key].startTime})
+            }
+          }
+        }
+      })
+      for (let index = this.dowmload_data.length - 1; index >= 0 ; index--) {
+        if(!fs.existsSync(this.dowmload_data[index].savePath)) {
+          this.dowmload_data.splice(index, 1);
+        }
+      }
+    })
+    ipcRenderer.on('clearAll', () => {
+      db.remove({}, { multi: true }, (err, ret) => {
+        if(!err) {
+          this.dowmload_data = []
+        }
+      })
     })
     //pg.set('key', {hello: 'lndb!'})
 
@@ -460,25 +509,20 @@
       },
 
       openDownload(e) {
+        this.$refs.dowmloadSon.deleteShow = false;
         this.dowmloadShow = !this.dowmloadShow;
         e.stopPropagation();
-        this.client.top = e.clientX;
-        this.client.left = e.clientY;
+        this.client.top = e.clientY;
+        this.client.left = e.clientX;
+
+        // console.log(this.client)
       },
       init() {
         // 读取历史数据
         db.find({}).sort({
           startTime: -1,
-        }).limit(50).exec((err, ret) => {
+        }).skip(0).limit(12).exec((err, ret) => {
           if (ret) {
-          /* this.setList(downloadHistory.map((d) => {
-            const item = d;
-            // 历史记录中，只有需要未完成和完成两个状态
-            if (item.state !== 'completed') { 
-              item.state = 'cancelled';
-            }
-            return item;
-          })); */
           for(let key in ret) {
             let filename = ret[key].savePath.split('\\').pop()
             ret[key].filename = filename
@@ -487,6 +531,7 @@
             ret[key].percent = Number(((ret[key].receivedBytes / ret[key].receivedBytes) * 100).toFixed(2))
             ret[key].totalBytes = this.computeSize(ret[key].receivedBytes)
             ret[key].receivedBytes = this.computeSize(ret[key].receivedBytes)
+            ret[key].fileExists = fs.existsSync(ret[key].savePath)
             const defaultIcon = require('../assets/images/default.png');
             if (!ret[key].savePath) {
               ret[key].icon =  defaultIcon
@@ -501,7 +546,7 @@
             }   
           }
           this.dowmload_data = ret
-          console.log(ret)
+          // console.log(ret)
         }
         })
       }

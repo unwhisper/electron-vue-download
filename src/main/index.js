@@ -41,9 +41,9 @@ function createWindow () {
    * Initial window options
    */
   mainWindow = new BrowserWindow({
-    height: 563,
+    height: 700,
     useContentSize: true,
-    width: 1000,
+    width: 1200,
     webPreferences: {
       nodeIntegration: true
     }
@@ -174,6 +174,16 @@ function createWindow () {
       }
     }
     mainWindow.webContents.send('removeRecord', args.time)
+  })
+
+  ipcMain.on('exists', (event, args) => {
+    mainWindow.webContents.send('refresh', args)
+  })
+  ipcMain.on('clearNoExists', (event, args) => {
+    mainWindow.webContents.send('clearNoFile')
+  })
+  ipcMain.on('clearAll', (event, args) => {
+    mainWindow.webContents.send('clearAll')
   })
 
   mainWindow.webContents.session.on('will-download', async (event, item) => {
