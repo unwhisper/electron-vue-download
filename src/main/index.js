@@ -16,7 +16,6 @@ if (process.env.NODE_ENV !== 'development') {
   global.__static = require('path').join(__dirname, '/static').replace(/\\/g, '\\\\')
 }
 
-const md5 = require('js-md5');
 //nodejs中的path模块
 const path=require('path');
 const fs = require('fs')
@@ -267,57 +266,3 @@ app.on('activate', () => {
     createWindow()
   }
 })
-
-/**
- * Auto Updater
- *
- * Uncomment the following code below and install `electron-updater` to
- * support auto updating. Code Signing with a valid certificate is required.
- * https://simulatedgreg.gitbooks.io/electron-vue/content/en/using-electron-builder.html#auto-updating
- */
-// 监听检查更新出错事件
-/* autoUpdater.autoDownload = false; //默认true，禁止自动更新
-autoUpdater.setFeedURL('http://127.0.0.1/electron/download/') // 更新地址与package.json中的build.publish.url相对应
-
-autoUpdater.on('error', function (error) {
-  sendUpdateMessage('检查更新出错');
-});
-// 监听正在检查更新事件
-autoUpdater.on('checking-for-update', function () {
-  sendUpdateMessage('正在检查更新……');
-});
-// 监听不需要更新事件
-autoUpdater.on('update-not-available', function (info) {
-  sendUpdateMessage('已经是最新版本' + info.version);
-});
-// 监听需要更新事件
-autoUpdater.on('update-available', function (info) {
-  mainWindow.webContents.send('updateAvailable', '<h3>检测到新版本' + info.version + '，是否升级？</h3>');//+ info.releaseNotes
-});
-// 监听下载进度事件
-autoUpdater.on('download-progress', function (progressObj) {
-  mainWindow.webContents.send('downloadProgress', progressObj);
-})
-//监听下载完成事件
-autoUpdater.on('update-downloaded', function (info) {
-  //监听渲染线程中用户是否应用更新
-  ipcMain.on('isUpdateNow', () => {
-      autoUpdater.quitAndInstall();
-  });
-  mainWindow.webContents.send('isUpdateNow');
-});
-//监听渲染线程中用户是否同意下载
-ipcMain.on("isDownload", () => {
-  autoUpdater.downloadUpdate();
-})
-
-ipcMain.on("checkForUpdate", () => {
-  if (process.env.NODE_ENV !== 'development') {
-      //执行自动检查更新
-      autoUpdater.checkForUpdates();
-  }
-})
-
-function sendUpdateMessage(text) {
-mainWindow.webContents.send('message', text);
-} */
